@@ -121,7 +121,45 @@ export default function Clientes() {
         />
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      {/* Mobile cards */}
+      <div className="sm:hidden space-y-3">
+        {loading ? (
+          <div className="text-center py-12"><div className="w-6 h-6 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto" /></div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-12 text-gray-400">{search ? 'No se encontraron resultados' : 'No hay clientes registrados'}</div>
+        ) : filtered.map(c => (
+          <div key={c.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm space-y-2">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="font-medium text-gray-900">{c.nombre}</p>
+                <p className="text-sm text-gray-500">{c.distrito || '—'}</p>
+              </div>
+              {c.tipo_cliente && (
+                <span className={`text-xs px-2.5 py-1 rounded-full font-medium capitalize shrink-0 ${tipoColors[c.tipo_cliente] || 'bg-gray-100 text-gray-600'}`}>
+                  {c.tipo_cliente}
+                </span>
+              )}
+            </div>
+            {(c.email || c.telefono) && (
+              <div className="text-sm text-gray-500 space-y-0.5">
+                {c.email && <p>{c.email}</p>}
+                {c.telefono && <p>{c.telefono}</p>}
+              </div>
+            )}
+            <div className="flex gap-2 pt-2 border-t border-gray-100">
+              <button onClick={() => openEdit(c)} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-sm text-indigo-600 hover:bg-indigo-50 rounded-lg transition">
+                <Edit2 className="w-4 h-4" /> Editar
+              </button>
+              <button onClick={() => handleDelete(c.id)} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-sm text-red-500 hover:bg-red-50 rounded-lg transition">
+                <Trash2 className="w-4 h-4" /> Eliminar
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden sm:block bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
@@ -167,10 +205,10 @@ export default function Clientes() {
         </div>
       </div>
 
-      {/* Modal */}
+      {/* Modal — bottom-sheet en móvil */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/40 z-40 flex items-end sm:items-center sm:p-4" onClick={() => setShowModal(false)}>
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <h2 className="font-semibold text-gray-900">{editingItem ? 'Editar Cliente' : 'Nuevo Cliente'}</h2>
               <button onClick={() => setShowModal(false)} className="p-1 hover:bg-gray-100 rounded-lg transition">
@@ -213,7 +251,7 @@ export default function Clientes() {
                 <textarea rows={2} value={form.direccion} onChange={e => setForm({ ...form, direccion: e.target.value })}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" />
               </div>
-              <div className="flex gap-3 pt-1">
+              <div className="flex gap-3 pt-1 pb-2">
                 <button type="button" onClick={() => setShowModal(false)}
                   className="flex-1 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition">
                   Cancelar

@@ -14,15 +14,15 @@ function StatCard({ title, value, icon: Icon, color, subtitle }) {
     purple: 'bg-purple-50 text-purple-600',
   }
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-sm font-medium text-gray-500">{title}</p>
-        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${colors[color]}`}>
-          <Icon className="w-5 h-5" />
+    <div className="bg-white rounded-xl border border-gray-200 p-4 lg:p-6 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs lg:text-sm font-medium text-gray-500 leading-tight">{title}</p>
+        <div className={`w-8 h-8 lg:w-10 lg:h-10 rounded-lg flex items-center justify-center shrink-0 ${colors[color]}`}>
+          <Icon className="w-4 h-4 lg:w-5 lg:h-5" />
         </div>
       </div>
-      <p className="text-3xl font-bold text-gray-900">{value}</p>
-      {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
+      <p className="text-2xl lg:text-3xl font-bold text-gray-900">{value}</p>
+      {subtitle && <p className="text-xs lg:text-sm text-gray-500 mt-1">{subtitle}</p>}
     </div>
   )
 }
@@ -108,7 +108,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         <StatCard title="Total Clientes" value={stats.clientes} icon={Users} color="indigo" />
         <StatCard title="Cotizaciones Pendientes" value={stats.cotizacionesPendientes} icon={FileText} color="yellow" />
         <StatCard title="Instalaciones Activas" value={stats.instalacionesActivas} icon={Wrench} color="blue" />

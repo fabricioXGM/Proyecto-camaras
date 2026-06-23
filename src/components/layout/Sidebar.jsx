@@ -7,6 +7,7 @@ import {
   ArrowLeftRight,
   Settings,
   Camera,
+  X,
 } from 'lucide-react'
 
 const navItems = [
@@ -18,18 +19,31 @@ const navItems = [
   { to: '/mantenimientos', icon: Settings, label: 'Mantenimientos' },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ open, onClose }) {
   return (
-    <aside className="w-64 bg-gray-900 flex flex-col h-screen sticky top-0 shrink-0">
-      {/* Logo */}
-      <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-700">
-        <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center">
-          <Camera className="w-5 h-5 text-white" />
+    <aside className={`
+      fixed lg:static inset-y-0 left-0 z-40
+      w-64 bg-gray-900 flex flex-col h-full lg:h-screen shrink-0
+      transition-transform duration-300 ease-in-out
+      ${open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+    `}>
+      {/* Logo + botón cerrar en móvil */}
+      <div className="flex items-center justify-between gap-3 px-6 py-5 border-b border-gray-700">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center shrink-0">
+            <Camera className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <p className="text-white font-bold text-base leading-none">GestorCam</p>
+            <p className="text-gray-400 text-xs mt-0.5">Cámaras de Seguridad</p>
+          </div>
         </div>
-        <div>
-          <p className="text-white font-bold text-base leading-none">GestorCam</p>
-          <p className="text-gray-400 text-xs mt-0.5">Cámaras de Seguridad</p>
-        </div>
+        <button
+          onClick={onClose}
+          className="lg:hidden p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition"
+        >
+          <X className="w-5 h-5" />
+        </button>
       </div>
 
       {/* Navigation */}
@@ -39,6 +53,7 @@ export default function Sidebar() {
             key={to}
             to={to}
             end={end}
+            onClick={onClose}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-sm font-medium ${
                 isActive

@@ -134,7 +134,41 @@ export default function Cotizaciones() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      {/* Mobile cards */}
+      <div className="sm:hidden space-y-3">
+        {loading ? (
+          <div className="text-center py-12"><div className="w-6 h-6 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto" /></div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-12 text-gray-400">No se encontraron cotizaciones</div>
+        ) : filtered.map(c => (
+          <div key={c.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm space-y-2">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="font-medium text-gray-900">{c.clientes?.nombre || 'Sin cliente'}</p>
+                <p className="text-sm text-gray-500">{c.fecha}</p>
+              </div>
+              <span className={`text-xs px-2.5 py-1 rounded-full font-medium shrink-0 ${estadoColors[c.estado] || 'bg-gray-100 text-gray-600'}`}>{c.estado}</span>
+            </div>
+            <p className="text-base font-semibold text-gray-900">
+              S/ {Number(c.total || 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+            </p>
+            <div className="flex gap-2 pt-2 border-t border-gray-100">
+              <button onClick={() => navigate(`/cotizaciones/${c.id}`)} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-sm text-indigo-600 hover:bg-indigo-50 rounded-lg transition">
+                <Eye className="w-4 h-4" /> Ver detalle
+              </button>
+              <button onClick={() => openEdit(c)} className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-100 rounded-lg transition">
+                <Edit2 className="w-4 h-4" />
+              </button>
+              <button onClick={() => handleDelete(c.id)} className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm text-red-500 hover:bg-red-50 rounded-lg transition">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden sm:block bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
@@ -181,9 +215,10 @@ export default function Cotizaciones() {
         </div>
       </div>
 
+      {/* Modal — bottom-sheet en móvil */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/40 z-40 flex items-end sm:items-center sm:p-4" onClick={() => setShowModal(false)}>
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <h2 className="font-semibold text-gray-900">{editingItem ? 'Editar Cotización' : 'Nueva Cotización'}</h2>
               <button onClick={() => setShowModal(false)} className="p-1 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5 text-gray-500" /></button>
@@ -214,7 +249,7 @@ export default function Cotizaciones() {
                 <textarea rows={3} value={form.notas} onChange={e => setForm({ ...form, notas: e.target.value })}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" />
               </div>
-              <div className="flex gap-3 pt-1">
+              <div className="flex gap-3 pt-1 pb-2">
                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition">Cancelar</button>
                 <button type="submit" disabled={saving} className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-indigo-700 transition disabled:opacity-50 font-medium">
                   {saving ? 'Guardando...' : editingItem ? 'Actualizar' : 'Crear y Ver Detalle'}
