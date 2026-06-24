@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
+const fmt = (s) => s ? s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '—'
+
 function StatCard({ title, value, icon: Icon, color, subtitle }) {
   const colors = {
     indigo: 'bg-indigo-50 text-indigo-600',
@@ -59,17 +61,17 @@ export default function Dashboard() {
       { data: cotRecientes },
       { data: instRecientes },
     ] = await Promise.all([
-      supabase.from('clientes').select('*', { count: 'exact', head: true }),
-      supabase.from('cotizaciones').select('*', { count: 'exact', head: true }).eq('estado', 'Pendiente'),
-      supabase.from('instalaciones').select('*', { count: 'exact', head: true }).in('estado', ['Programada', 'En Proceso']),
-      supabase.from('mantenimientos').select('*', { count: 'exact', head: true }).in('estado', ['Programado', 'En Proceso']),
-      supabase.from('movimientos').select('tipo, monto').gte('fecha', startMonth).lte('fecha', endMonth),
-      supabase.from('cotizaciones').select('*, clientes(nombre)').order('created_at', { ascending: false }).limit(5),
-      supabase.from('instalaciones').select('*, clientes(nombre)').order('created_at', { ascending: false }).limit(5),
+      supabase.from('clientes').select('*', { count: 'exact', head: true }).eq('activo', true),
+      supabase.from('cotizaciones').select('*', { count: 'exact', head: true }).eq('activo', true).eq('estado', 'pendiente'),
+      supabase.from('instalaciones').select('*', { count: 'exact', head: true }).eq('activo', true).in('estado', ['programada', 'en_proceso']),
+      supabase.from('mantenimientos').select('*', { count: 'exact', head: true }).eq('activo', true).eq('estado', 'programado'),
+      supabase.from('movimientos').select('tipo, monto').eq('activo', true).gte('fecha', startMonth).lte('fecha', endMonth),
+      supabase.from('cotizaciones').select('id_cotizacion, id_cliente, fecha, estado, total, creado_en, clientes(nombre)').eq('activo', true).order('creado_en', { ascending: false }).limit(5),
+      supabase.from('instalaciones').select('id_instalacion, fecha_instalacion, estado, creado_en, cotizaciones(clientes(nombre))').eq('activo', true).order('creado_en', { ascending: false }).limit(5),
     ])
 
-    const ingresosMes = (movimientos || []).filter(m => m.tipo === 'Ingreso').reduce((s, m) => s + Number(m.monto), 0)
-    const salidasMes = (movimientos || []).filter(m => m.tipo === 'Salida').reduce((s, m) => s + Number(m.monto), 0)
+    const ingresosMes = (movimientos || []).filter(m => m.tipo === 'I').reduce((s, m) => s + Number(m.monto), 0)
+    const salidasMes = (movimientos || []).filter(m => m.tipo === 'S').reduce((s, m) => s + Number(m.monto), 0)
 
     setStats({
       clientes: clientes || 0,
@@ -85,14 +87,14 @@ export default function Dashboard() {
   }
 
   const estadoBadge = {
-    Pendiente: 'bg-yellow-100 text-yellow-700',
-    Aprobada: 'bg-green-100 text-green-700',
-    Rechazada: 'bg-red-100 text-red-700',
-    Facturada: 'bg-blue-100 text-blue-700',
-    Programada: 'bg-indigo-100 text-indigo-700',
-    'En Proceso': 'bg-orange-100 text-orange-700',
-    Completada: 'bg-green-100 text-green-700',
-    Cancelada: 'bg-red-100 text-red-700',
+    pendiente: 'bg-yellow-100 text-yellow-700',
+    aprobada: 'bg-green-100 text-green-700',
+    rechazada: 'bg-red-100 text-red-700',
+    vencida: 'bg-orange-100 text-orange-700',
+    programada: 'bg-indigo-100 text-indigo-700',
+    en_proceso: 'bg-orange-100 text-orange-700',
+    completada: 'bg-green-100 text-green-700',
+    garantia: 'bg-purple-100 text-purple-700',
   }
 
   const mesActual = format(new Date(), 'MMMM yyyy', { locale: es })
@@ -164,17 +166,17 @@ export default function Dashboard() {
           ) : (
             <div className="divide-y divide-gray-50">
               {recentCotizaciones.map(c => (
-                <div key={c.id} className="px-6 py-3 flex items-center justify-between">
+                <div key={c.id_cotizacion} className="px-6 py-3 flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-900">{c.clientes?.nombre || 'Sin cliente'}</p>
                     <p className="text-xs text-gray-500">{c.fecha}</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-sm font-medium text-gray-700">
-                      S/ {Number(c.total).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+                      S/ {Number(c.total || 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
                     </span>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${estadoBadge[c.estado] || 'bg-gray-100 text-gray-600'}`}>
-                      {c.estado}
+                      {fmt(c.estado)}
                     </span>
                   </div>
                 </div>
@@ -193,13 +195,13 @@ export default function Dashboard() {
           ) : (
             <div className="divide-y divide-gray-50">
               {recentInstalaciones.map(i => (
-                <div key={i.id} className="px-6 py-3 flex items-center justify-between">
+                <div key={i.id_instalacion} className="px-6 py-3 flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-900">{i.clientes?.nombre || 'Sin cliente'}</p>
-                    <p className="text-xs text-gray-500">{i.tecnico || 'Sin técnico'} · {i.fecha_instalacion || 'Sin fecha'}</p>
+                    <p className="text-sm font-medium text-gray-900">{i.cotizaciones?.clientes?.nombre || 'Sin cliente'}</p>
+                    <p className="text-xs text-gray-500">{i.fecha_instalacion || 'Sin fecha'}</p>
                   </div>
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${estadoBadge[i.estado] || 'bg-gray-100 text-gray-600'}`}>
-                    {i.estado}
+                    {fmt(i.estado)}
                   </span>
                 </div>
               ))}

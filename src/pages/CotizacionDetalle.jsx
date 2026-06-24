@@ -8,12 +8,16 @@ import {
 import { getClientesSelect } from '../services/clientes'
 import { useNotification } from '../hooks/useNotification'
 
+const fmt = (s) => s ? s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '—'
+
 const estadoColors = {
-  Pendiente: 'bg-yellow-100 text-yellow-700',
-  Aprobada: 'bg-green-100 text-green-700',
-  Rechazada: 'bg-red-100 text-red-700',
-  Facturada: 'bg-blue-100 text-blue-700',
+  pendiente: 'bg-yellow-100 text-yellow-700',
+  aprobada: 'bg-green-100 text-green-700',
+  rechazada: 'bg-red-100 text-red-700',
+  vencida: 'bg-orange-100 text-orange-700',
 }
+
+const TIPOS_ITEM = ['camara', 'dvr', 'nvr', 'cable', 'canaleta', 'fuente', 'disco', 'monitor', 'mano_obra', 'otro']
 
 function Notification({ n }) {
   if (!n) return null
@@ -24,7 +28,7 @@ function Notification({ n }) {
   )
 }
 
-const emptyLine = { descripcion: '', cantidad: 1, precio_unitario: 0, subtotal: 0 }
+const emptyLine = { tipo_item: 'otro', descripcion: '', cantidad: 1, precio_unitario: 0 }
 
 export default function CotizacionDetalle() {
   const { id } = useParams()
@@ -76,17 +80,18 @@ export default function CotizacionDetalle() {
 
   function openEditLine(line) {
     setEditingLine(line)
-    setLineForm({ descripcion: line.descripcion, cantidad: line.cantidad, precio_unitario: line.precio_unitario, subtotal: line.subtotal })
+    setLineForm({
+      tipo_item: line.tipo_item || 'otro',
+      descripcion: line.descripcion,
+      cantidad: line.cantidad,
+      precio_unitario: line.precio_unitario,
+    })
     setShowLineModal(true)
-  }
-
-  function calcSubtotal(form) {
-    return (Number(form.cantidad) * Number(form.precio_unitario)).toFixed(2)
   }
 
   async function handleLineSubmit(e) {
     e.preventDefault()
-    const payload = { ...lineForm, subtotal: calcSubtotal(lineForm), cotizacion_id: id }
+    const payload = { ...lineForm, cotizacion_id: id }
     setSaving(true)
     try {
       if (editingLine) {
@@ -132,7 +137,6 @@ export default function CotizacionDetalle() {
     <div className="space-y-6 max-w-5xl">
       <Notification n={notification} />
 
-      {/* Back + Header */}
       <div className="flex items-center gap-4">
         <button onClick={() => navigate('/cotizaciones')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-indigo-600 transition">
           <ArrowLeft className="w-4 h-4" /> Volver
@@ -144,7 +148,9 @@ export default function CotizacionDetalle() {
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <h3 className="font-semibold text-gray-900">Información de la Cotización</h3>
-            <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${estadoColors[cotizacion.estado]}`}>{cotizacion.estado}</span>
+            <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${estadoColors[cotizacion.estado] || 'bg-gray-100 text-gray-600'}`}>
+              {fmt(cotizacion.estado)}
+            </span>
           </div>
           {!editHeader && (
             <button onClick={() => setEditHeader(true)} className="flex items-center gap-2 text-sm text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition">
@@ -172,7 +178,9 @@ export default function CotizacionDetalle() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
               <select value={headerForm.estado} onChange={e => setHeaderForm({ ...headerForm, estado: e.target.value })}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                {['Pendiente', 'Aprobada', 'Rechazada', 'Facturada'].map(s => <option key={s}>{s}</option>)}
+                {['pendiente', 'aprobada', 'rechazada', 'vencida'].map(s => (
+                  <option key={s} value={s}>{fmt(s)}</option>
+                ))}
               </select>
             </div>
             <div className="sm:col-span-2">
@@ -224,6 +232,7 @@ export default function CotizacionDetalle() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
+                <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Tipo</th>
                 <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Descripción</th>
                 <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Cantidad</th>
                 <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">P. Unitario</th>
@@ -233,9 +242,12 @@ export default function CotizacionDetalle() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {lineas.length === 0 ? (
-                <tr><td colSpan={5} className="text-center py-8 text-gray-400 text-sm">No hay líneas. Agregue items a esta cotización.</td></tr>
+                <tr><td colSpan={6} className="text-center py-8 text-gray-400 text-sm">No hay líneas. Agregue items a esta cotización.</td></tr>
               ) : lineas.map(l => (
                 <tr key={l.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-3">
+                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-medium">{fmt(l.tipo_item || 'otro')}</span>
+                  </td>
                   <td className="px-6 py-3 text-gray-800">{l.descripcion}</td>
                   <td className="px-4 py-3 text-right text-gray-600">{Number(l.cantidad).toLocaleString('es-PE')}</td>
                   <td className="px-4 py-3 text-right text-gray-600">S/ {Number(l.precio_unitario).toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
@@ -252,7 +264,7 @@ export default function CotizacionDetalle() {
             {lineas.length > 0 && (
               <tfoot className="bg-indigo-50 border-t-2 border-indigo-200">
                 <tr>
-                  <td colSpan={3} className="px-6 py-3 text-right font-semibold text-gray-700">TOTAL</td>
+                  <td colSpan={4} className="px-6 py-3 text-right font-semibold text-gray-700">TOTAL</td>
                   <td className="px-4 py-3 text-right font-bold text-lg text-indigo-700">
                     S/ {total.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
                   </td>
@@ -274,9 +286,18 @@ export default function CotizacionDetalle() {
             </div>
             <form onSubmit={handleLineSubmit} className="px-6 py-5 space-y-4">
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Item</label>
+                <select value={lineForm.tipo_item} onChange={e => setLineForm({ ...lineForm, tipo_item: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  {TIPOS_ITEM.map(t => (
+                    <option key={t} value={t}>{fmt(t)}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Descripción <span className="text-red-500">*</span></label>
                 <input type="text" required value={lineForm.descripcion} onChange={e => setLineForm({ ...lineForm, descripcion: e.target.value })}
-                  placeholder="Ej: Cámara IP 4MP, Cable coaxial, etc."
+                  placeholder="Ej: Cámara IP 4MP Hikvision, Cable UTP Cat6..."
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               </div>
               <div className="grid grid-cols-2 gap-3">

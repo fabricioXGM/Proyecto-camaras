@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Plus, Search, Edit2, Trash2, X, AlertCircle } from 'lucide-react'
 import { getMantenimientos, createMantenimiento, updateMantenimiento, deleteMantenimiento } from '../services/mantenimientos'
-import { getClientesSelect } from '../services/clientes'
 import { getInstalacionesSelect } from '../services/instalaciones'
 import { useNotification } from '../hooks/useNotification'
 
@@ -14,31 +13,36 @@ function Notification({ n }) {
   )
 }
 
+const fmt = (s) => s ? s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '—'
+
 const estadoColors = {
-  Programado: 'bg-indigo-100 text-indigo-700',
-  'En Proceso': 'bg-orange-100 text-orange-700',
-  Completado: 'bg-green-100 text-green-700',
-  Cancelado: 'bg-red-100 text-red-700',
+  programado: 'bg-indigo-100 text-indigo-700',
+  completado: 'bg-green-100 text-green-700',
+  cancelado: 'bg-red-100 text-red-700',
 }
 
 const tipoColors = {
-  Preventivo: 'bg-blue-100 text-blue-700',
-  Correctivo: 'bg-orange-100 text-orange-700',
+  preventivo: 'bg-blue-100 text-blue-700',
+  correctivo: 'bg-orange-100 text-orange-700',
+  garantia: 'bg-purple-100 text-purple-700',
 }
 
 const emptyForm = {
-  cliente_id: '', instalacion_id: '', fecha: new Date().toISOString().split('T')[0],
-  tipo: 'Preventivo', descripcion: '', estado: 'Programado', tecnico: ''
+  instalacion_id: '',
+  fecha: new Date().toISOString().split('T')[0],
+  tipo: 'preventivo',
+  descripcion: '',
+  costo: '',
+  estado: 'programado',
 }
 
 export default function Mantenimientos() {
   const [items, setItems] = useState([])
-  const [clientes, setClientes] = useState([])
   const [instalaciones, setInstalaciones] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [filterEstado, setFilterEstado] = useState('Todos')
-  const [filterTipo, setFilterTipo] = useState('Todos')
+  const [filterEstado, setFilterEstado] = useState('todos')
+  const [filterTipo, setFilterTipo] = useState('todos')
   const [showModal, setShowModal] = useState(false)
   const [editingItem, setEditingItem] = useState(null)
   const [form, setForm] = useState(emptyForm)
@@ -55,12 +59,8 @@ export default function Mantenimientos() {
   }
 
   async function fetchSelects() {
-    const [{ data: cls }, { data: inst }] = await Promise.all([
-      getClientesSelect(),
-      getInstalacionesSelect(),
-    ])
-    setClientes(cls || [])
-    setInstalaciones(inst || [])
+    const { data } = await getInstalacionesSelect()
+    setInstalaciones(data || [])
   }
 
   function openAdd() { setEditingItem(null); setForm(emptyForm); setShowModal(true) }
@@ -68,24 +68,26 @@ export default function Mantenimientos() {
   function openEdit(item) {
     setEditingItem(item)
     setForm({
-      cliente_id: item.cliente_id || '', instalacion_id: item.instalacion_id || '',
-      fecha: item.fecha, tipo: item.tipo, descripcion: item.descripcion || '',
-      estado: item.estado, tecnico: item.tecnico || ''
+      instalacion_id: item.instalacion_id || '',
+      fecha: item.fecha,
+      tipo: item.tipo,
+      descripcion: item.descripcion || '',
+      costo: item.costo || '',
+      estado: item.estado,
     })
     setShowModal(true)
   }
 
   async function handleSubmit(e) {
     e.preventDefault()
-    const payload = { ...form, cliente_id: form.cliente_id || null, instalacion_id: form.instalacion_id || null }
     setSaving(true)
     try {
       if (editingItem) {
-        const { error } = await updateMantenimiento(editingItem.id, payload)
+        const { error } = await updateMantenimiento(editingItem.id, form)
         if (error) throw error
         notify('Mantenimiento actualizado')
       } else {
-        const { error } = await createMantenimiento(payload)
+        const { error } = await createMantenimiento(form)
         if (error) throw error
         notify('Mantenimiento registrado')
       }
@@ -108,10 +110,9 @@ export default function Mantenimientos() {
   const filtered = items.filter(i => {
     const matchSearch =
       (i.clientes?.nombre || '').toLowerCase().includes(search.toLowerCase()) ||
-      (i.tecnico || '').toLowerCase().includes(search.toLowerCase()) ||
       (i.descripcion || '').toLowerCase().includes(search.toLowerCase())
-    const matchEstado = filterEstado === 'Todos' || i.estado === filterEstado
-    const matchTipo = filterTipo === 'Todos' || i.tipo === filterTipo
+    const matchEstado = filterEstado === 'todos' || i.estado === filterEstado
+    const matchTipo = filterTipo === 'todos' || i.tipo === filterTipo
     return matchSearch && matchEstado && matchTipo
   })
 
@@ -133,23 +134,23 @@ export default function Mantenimientos() {
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input type="text" placeholder="Buscar por cliente, técnico o descripción..." value={search}
+          <input type="text" placeholder="Buscar por cliente o descripción..." value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         </div>
         <div className="flex gap-1 flex-wrap">
-          {['Todos', 'Programado', 'En Proceso', 'Completado', 'Cancelado'].map(e => (
+          {['todos', 'programado', 'completado', 'cancelado'].map(e => (
             <button key={e} onClick={() => setFilterEstado(e)}
               className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${filterEstado === e ? 'bg-indigo-600 text-white' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
-              {e}
+              {e === 'todos' ? 'Todos' : fmt(e)}
             </button>
           ))}
         </div>
-        <div className="flex gap-1">
-          {['Todos', 'Preventivo', 'Correctivo'].map(t => (
+        <div className="flex gap-1 flex-wrap">
+          {['todos', 'preventivo', 'correctivo', 'garantia'].map(t => (
             <button key={t} onClick={() => setFilterTipo(t)}
               className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${filterTipo === t ? 'bg-indigo-600 text-white' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
-              {t}
+              {t === 'todos' ? 'Todos' : fmt(t)}
             </button>
           ))}
         </div>
@@ -166,11 +167,14 @@ export default function Mantenimientos() {
             <div className="flex items-start justify-between gap-2">
               <div>
                 <p className="font-medium text-gray-900">{i.clientes?.nombre || <span className="text-gray-400">Sin cliente</span>}</p>
-                <p className="text-sm text-gray-500">{i.fecha}{i.tecnico ? ` · ${i.tecnico}` : ''}</p>
+                <p className="text-sm text-gray-500">
+                  {i.fecha}
+                  {i.costo ? ` · S/ ${Number(i.costo).toLocaleString('es-PE', { minimumFractionDigits: 2 })}` : ''}
+                </p>
               </div>
               <div className="flex flex-col items-end gap-1 shrink-0">
-                <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${estadoColors[i.estado] || 'bg-gray-100 text-gray-600'}`}>{i.estado}</span>
-                <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${tipoColors[i.tipo]}`}>{i.tipo}</span>
+                <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${estadoColors[i.estado] || 'bg-gray-100 text-gray-600'}`}>{fmt(i.estado)}</span>
+                <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${tipoColors[i.tipo] || 'bg-gray-100 text-gray-600'}`}>{fmt(i.tipo)}</span>
               </div>
             </div>
             {i.descripcion && <p className="text-sm text-gray-500 line-clamp-2">{i.descripcion}</p>}
@@ -196,7 +200,7 @@ export default function Mantenimientos() {
                 <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Fecha</th>
                 <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Tipo</th>
                 <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Estado</th>
-                <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Técnico</th>
+                <th className="text-right px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Costo</th>
                 <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Descripción</th>
                 <th className="text-right px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Acciones</th>
               </tr>
@@ -211,12 +215,14 @@ export default function Mantenimientos() {
                   <td className="px-6 py-4 font-medium text-gray-900">{i.clientes?.nombre || <span className="text-gray-400">—</span>}</td>
                   <td className="px-6 py-4 text-gray-600">{i.fecha}</td>
                   <td className="px-6 py-4">
-                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${tipoColors[i.tipo]}`}>{i.tipo}</span>
+                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${tipoColors[i.tipo] || 'bg-gray-100 text-gray-600'}`}>{fmt(i.tipo)}</span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${estadoColors[i.estado] || 'bg-gray-100 text-gray-600'}`}>{i.estado}</span>
+                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${estadoColors[i.estado] || 'bg-gray-100 text-gray-600'}`}>{fmt(i.estado)}</span>
                   </td>
-                  <td className="px-6 py-4 text-gray-600">{i.tecnico || <span className="text-gray-400">—</span>}</td>
+                  <td className="px-6 py-4 text-right text-gray-700">
+                    {i.costo ? `S/ ${Number(i.costo).toLocaleString('es-PE', { minimumFractionDigits: 2 })}` : <span className="text-gray-300">—</span>}
+                  </td>
                   <td className="px-6 py-4 text-gray-500 max-w-xs truncate">{i.descripcion || <span className="text-gray-300">—</span>}</td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-1">
@@ -233,7 +239,7 @@ export default function Mantenimientos() {
 
       {/* Modal — bottom-sheet en móvil */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/40 z-40 flex items-end sm:items-center sm:p-4" onClick={() => setShowModal(false)}>
+        <div className="fixed inset-0 bg-black/40 z-40 flex items-end justify-center sm:items-center sm:p-4" onClick={() => setShowModal(false)}>
           <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <h2 className="font-semibold text-gray-900">{editingItem ? 'Editar Mantenimiento' : 'Nuevo Mantenimiento'}</h2>
@@ -241,19 +247,15 @@ export default function Mantenimientos() {
             </div>
             <form onSubmit={handleSubmit} className="px-6 py-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="sm:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
-                <select value={form.cliente_id} onChange={e => setForm({ ...form, cliente_id: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                  <option value="">Sin cliente</option>
-                  {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                </select>
-              </div>
-              <div className="sm:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Instalación Relacionada</label>
                 <select value={form.instalacion_id} onChange={e => setForm({ ...form, instalacion_id: e.target.value })}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                   <option value="">Sin instalación</option>
-                  {instalaciones.map(i => <option key={i.id} value={i.id}>{i.clientes?.nombre || 'Sin cliente'} — {i.fecha_instalacion || 'Sin fecha'}</option>)}
+                  {instalaciones.map(i => (
+                    <option key={i.id} value={i.id}>
+                      {i.clientes?.nombre || 'Sin cliente'} — {i.fecha_instalacion || 'Sin fecha'}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -262,23 +264,28 @@ export default function Mantenimientos() {
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Técnico</label>
-                <input type="text" value={form.tecnico} onChange={e => setForm({ ...form, tecnico: e.target.value })}
+                <label className="block text-sm font-medium text-gray-700 mb-1">Costo (S/)</label>
+                <input type="number" min="0" step="0.01" value={form.costo}
+                  onChange={e => setForm({ ...form, costo: e.target.value })}
+                  placeholder="0.00"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
                 <select value={form.tipo} onChange={e => setForm({ ...form, tipo: e.target.value })}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                  <option>Preventivo</option>
-                  <option>Correctivo</option>
+                  {['preventivo', 'correctivo', 'garantia'].map(s => (
+                    <option key={s} value={s}>{fmt(s)}</option>
+                  ))}
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
                 <select value={form.estado} onChange={e => setForm({ ...form, estado: e.target.value })}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                  {['Programado', 'En Proceso', 'Completado', 'Cancelado'].map(s => <option key={s}>{s}</option>)}
+                  {['programado', 'completado', 'cancelado'].map(s => (
+                    <option key={s} value={s}>{fmt(s)}</option>
+                  ))}
                 </select>
               </div>
               <div className="sm:col-span-2">

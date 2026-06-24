@@ -14,15 +14,17 @@ function Notification({ n }) {
   )
 }
 
+const fmt = (s) => s ? s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '—'
+
 const estadoColors = {
-  Pendiente: 'bg-yellow-100 text-yellow-700',
-  Aprobada: 'bg-green-100 text-green-700',
-  Rechazada: 'bg-red-100 text-red-700',
-  Facturada: 'bg-blue-100 text-blue-700',
+  pendiente: 'bg-yellow-100 text-yellow-700',
+  aprobada: 'bg-green-100 text-green-700',
+  rechazada: 'bg-red-100 text-red-700',
+  vencida: 'bg-orange-100 text-orange-700',
 }
 
-const estados = ['Todos', 'Pendiente', 'Aprobada', 'Rechazada', 'Facturada']
-const emptyForm = { cliente_id: '', fecha: new Date().toISOString().split('T')[0], estado: 'Pendiente', notas: '' }
+const estados = ['todos', 'pendiente', 'aprobada', 'rechazada', 'vencida']
+const emptyForm = { cliente_id: '', fecha: new Date().toISOString().split('T')[0], estado: 'pendiente', notas: '' }
 
 export default function Cotizaciones() {
   const navigate = useNavigate()
@@ -30,7 +32,7 @@ export default function Cotizaciones() {
   const [clientes, setClientes] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [filterEstado, setFilterEstado] = useState('Todos')
+  const [filterEstado, setFilterEstado] = useState('todos')
   const [showModal, setShowModal] = useState(false)
   const [editingItem, setEditingItem] = useState(null)
   const [form, setForm] = useState(emptyForm)
@@ -90,7 +92,7 @@ export default function Cotizaciones() {
   }
 
   async function handleDelete(id) {
-    if (!window.confirm('¿Eliminar esta cotización? Se eliminarán también sus líneas de detalle.')) return
+    if (!window.confirm('¿Eliminar esta cotización?')) return
     const { error } = await deleteCotizacion(id)
     if (error) notify(error.message, 'error')
     else { notify('Cotización eliminada'); fetchData() }
@@ -98,7 +100,7 @@ export default function Cotizaciones() {
 
   const filtered = items.filter(c => {
     const matchSearch = (c.clientes?.nombre || '').toLowerCase().includes(search.toLowerCase())
-    const matchEstado = filterEstado === 'Todos' || c.estado === filterEstado
+    const matchEstado = filterEstado === 'todos' || c.estado === filterEstado
     return matchSearch && matchEstado
   })
 
@@ -128,7 +130,7 @@ export default function Cotizaciones() {
           {estados.map(e => (
             <button key={e} onClick={() => setFilterEstado(e)}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${filterEstado === e ? 'bg-indigo-600 text-white' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
-              {e}
+              {e === 'todos' ? 'Todos' : fmt(e)}
             </button>
           ))}
         </div>
@@ -147,7 +149,7 @@ export default function Cotizaciones() {
                 <p className="font-medium text-gray-900">{c.clientes?.nombre || 'Sin cliente'}</p>
                 <p className="text-sm text-gray-500">{c.fecha}</p>
               </div>
-              <span className={`text-xs px-2.5 py-1 rounded-full font-medium shrink-0 ${estadoColors[c.estado] || 'bg-gray-100 text-gray-600'}`}>{c.estado}</span>
+              <span className={`text-xs px-2.5 py-1 rounded-full font-medium shrink-0 ${estadoColors[c.estado] || 'bg-gray-100 text-gray-600'}`}>{fmt(c.estado)}</span>
             </div>
             <p className="text-base font-semibold text-gray-900">
               S/ {Number(c.total || 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
@@ -190,7 +192,7 @@ export default function Cotizaciones() {
                   <td className="px-6 py-4 font-medium text-gray-900">{c.clientes?.nombre || <span className="text-gray-400">Sin cliente</span>}</td>
                   <td className="px-6 py-4 text-gray-600">{c.fecha}</td>
                   <td className="px-6 py-4">
-                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${estadoColors[c.estado] || 'bg-gray-100 text-gray-600'}`}>{c.estado}</span>
+                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${estadoColors[c.estado] || 'bg-gray-100 text-gray-600'}`}>{fmt(c.estado)}</span>
                   </td>
                   <td className="px-6 py-4 text-right font-semibold text-gray-900">
                     S/ {Number(c.total || 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
@@ -217,7 +219,7 @@ export default function Cotizaciones() {
 
       {/* Modal — bottom-sheet en móvil */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/40 z-40 flex items-end sm:items-center sm:p-4" onClick={() => setShowModal(false)}>
+        <div className="fixed inset-0 bg-black/40 z-40 flex items-end justify-center sm:items-center sm:p-4" onClick={() => setShowModal(false)}>
           <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <h2 className="font-semibold text-gray-900">{editingItem ? 'Editar Cotización' : 'Nueva Cotización'}</h2>
@@ -241,7 +243,9 @@ export default function Cotizaciones() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
                 <select value={form.estado} onChange={e => setForm({ ...form, estado: e.target.value })}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                  {['Pendiente', 'Aprobada', 'Rechazada', 'Facturada'].map(s => <option key={s}>{s}</option>)}
+                  {['pendiente', 'aprobada', 'rechazada', 'vencida'].map(s => (
+                    <option key={s} value={s}>{fmt(s)}</option>
+                  ))}
                 </select>
               </div>
               <div>

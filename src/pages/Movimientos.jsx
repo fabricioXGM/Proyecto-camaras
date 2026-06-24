@@ -13,14 +13,25 @@ function Notification({ n }) {
   )
 }
 
+const fmt = (s) => s ? s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '—'
+
+// tipo en DB: 'I' = Ingreso, 'S' = Salida
+const TIPO_LABEL = { I: 'Ingreso', S: 'Salida' }
 const tipoColors = {
-  Ingreso: 'bg-green-100 text-green-700',
-  Salida: 'bg-red-100 text-red-700',
+  I: 'bg-green-100 text-green-700',
+  S: 'bg-red-100 text-red-700',
 }
 
+const CATEGORIAS = {
+  I: ['cobro_instalacion', 'adelanto', 'saldo', 'cobro_mantenimiento', 'otro_ingreso'],
+  S: ['equipos', 'herramientas', 'combustible', 'publicidad', 'servicios', 'alquiler', 'otro_gasto'],
+}
+const METODOS_PAGO = ['efectivo', 'yape', 'plin', 'transferencia']
+
 const emptyForm = {
-  tipo: 'Ingreso', concepto: '', monto: '',
-  fecha: new Date().toISOString().split('T')[0], referencia: '', instalacion_id: ''
+  tipo: 'I', categoria: '', concepto: '', monto: '',
+  fecha: new Date().toISOString().split('T')[0],
+  metodo_pago: '', referencia: '', instalacion_id: '',
 }
 
 export default function Movimientos() {
@@ -54,8 +65,14 @@ export default function Movimientos() {
   function openEdit(item) {
     setEditingItem(item)
     setForm({
-      tipo: item.tipo, concepto: item.concepto, monto: item.monto,
-      fecha: item.fecha, referencia: item.referencia || '', instalacion_id: item.instalacion_id || ''
+      tipo: item.tipo,
+      categoria: item.categoria || '',
+      concepto: item.concepto,
+      monto: item.monto,
+      fecha: item.fecha,
+      metodo_pago: item.metodo_pago || '',
+      referencia: item.referencia || '',
+      instalacion_id: item.instalacion_id || '',
     })
     setShowModal(true)
   }
@@ -91,14 +108,16 @@ export default function Movimientos() {
   }
 
   const filtered = items.filter(i => {
-    const matchSearch = i.concepto.toLowerCase().includes(search.toLowerCase()) ||
-      (i.referencia || '').toLowerCase().includes(search.toLowerCase())
+    const matchSearch =
+      i.concepto.toLowerCase().includes(search.toLowerCase()) ||
+      (i.referencia || '').toLowerCase().includes(search.toLowerCase()) ||
+      (i.categoria || '').toLowerCase().includes(search.toLowerCase())
     const matchTipo = filterTipo === 'Todos' || i.tipo === filterTipo
     return matchSearch && matchTipo
   })
 
-  const totalIngresos = items.filter(i => i.tipo === 'Ingreso').reduce((s, i) => s + Number(i.monto), 0)
-  const totalSalidas = items.filter(i => i.tipo === 'Salida').reduce((s, i) => s + Number(i.monto), 0)
+  const totalIngresos = items.filter(i => i.tipo === 'I').reduce((s, i) => s + Number(i.monto), 0)
+  const totalSalidas = items.filter(i => i.tipo === 'S').reduce((s, i) => s + Number(i.monto), 0)
   const balance = totalIngresos - totalSalidas
 
   return (
@@ -152,15 +171,15 @@ export default function Movimientos() {
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input type="text" placeholder="Buscar por concepto o referencia..." value={search}
+          <input type="text" placeholder="Buscar por concepto, categoría o referencia..." value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         </div>
         <div className="flex gap-1">
-          {['Todos', 'Ingreso', 'Salida'].map(t => (
-            <button key={t} onClick={() => setFilterTipo(t)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${filterTipo === t ? 'bg-indigo-600 text-white' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
-              {t}
+          {[{ key: 'Todos', label: 'Todos' }, { key: 'I', label: 'Ingresos' }, { key: 'S', label: 'Salidas' }].map(t => (
+            <button key={t.key} onClick={() => setFilterTipo(t.key)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${filterTipo === t.key ? 'bg-indigo-600 text-white' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
+              {t.label}
             </button>
           ))}
         </div>
@@ -177,12 +196,16 @@ export default function Movimientos() {
             <div className="flex items-start justify-between gap-2">
               <div>
                 <p className="font-medium text-gray-900">{i.concepto}</p>
-                <p className="text-sm text-gray-500">{i.fecha}{i.referencia ? ` · ${i.referencia}` : ''}</p>
+                <p className="text-sm text-gray-500">
+                  {i.fecha}
+                  {i.categoria ? ` · ${fmt(i.categoria)}` : ''}
+                  {i.referencia ? ` · ${i.referencia}` : ''}
+                </p>
               </div>
-              <span className={`text-xs px-2.5 py-1 rounded-full font-medium shrink-0 ${tipoColors[i.tipo]}`}>{i.tipo}</span>
+              <span className={`text-xs px-2.5 py-1 rounded-full font-medium shrink-0 ${tipoColors[i.tipo]}`}>{TIPO_LABEL[i.tipo]}</span>
             </div>
-            <p className={`text-base font-semibold ${i.tipo === 'Ingreso' ? 'text-green-600' : 'text-red-600'}`}>
-              {i.tipo === 'Ingreso' ? '+' : '-'} S/ {Number(i.monto).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+            <p className={`text-base font-semibold ${i.tipo === 'I' ? 'text-green-600' : 'text-red-600'}`}>
+              {i.tipo === 'I' ? '+' : '-'} S/ {Number(i.monto).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
             </p>
             <div className="flex gap-2 pt-2 border-t border-gray-100">
               <button onClick={() => openEdit(i)} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-sm text-indigo-600 hover:bg-indigo-50 rounded-lg transition">
@@ -204,28 +227,30 @@ export default function Movimientos() {
               <tr>
                 <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Tipo</th>
                 <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Concepto</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Categoría</th>
                 <th className="text-right px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Monto</th>
                 <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Fecha</th>
-                <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Referencia</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Método</th>
                 <th className="text-right px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr><td colSpan={6} className="text-center py-12"><div className="w-6 h-6 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto" /></td></tr>
+                <tr><td colSpan={7} className="text-center py-12"><div className="w-6 h-6 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto" /></td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={6} className="text-center py-12 text-gray-400">No se encontraron movimientos</td></tr>
+                <tr><td colSpan={7} className="text-center py-12 text-gray-400">No se encontraron movimientos</td></tr>
               ) : filtered.map(i => (
                 <tr key={i.id} className="hover:bg-gray-50 transition">
                   <td className="px-6 py-4">
-                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${tipoColors[i.tipo]}`}>{i.tipo}</span>
+                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${tipoColors[i.tipo]}`}>{TIPO_LABEL[i.tipo]}</span>
                   </td>
                   <td className="px-6 py-4 font-medium text-gray-900">{i.concepto}</td>
-                  <td className={`px-6 py-4 text-right font-semibold ${i.tipo === 'Ingreso' ? 'text-green-600' : 'text-red-600'}`}>
-                    {i.tipo === 'Ingreso' ? '+' : '-'} S/ {Number(i.monto).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+                  <td className="px-6 py-4 text-gray-500">{i.categoria ? fmt(i.categoria) : <span className="text-gray-300">—</span>}</td>
+                  <td className={`px-6 py-4 text-right font-semibold ${i.tipo === 'I' ? 'text-green-600' : 'text-red-600'}`}>
+                    {i.tipo === 'I' ? '+' : '-'} S/ {Number(i.monto).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
                   </td>
                   <td className="px-6 py-4 text-gray-600">{i.fecha}</td>
-                  <td className="px-6 py-4 text-gray-500">{i.referencia || <span className="text-gray-300">—</span>}</td>
+                  <td className="px-6 py-4 text-gray-500">{i.metodo_pago ? fmt(i.metodo_pago) : <span className="text-gray-300">—</span>}</td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-1">
                       <button onClick={() => openEdit(i)} className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition"><Edit2 className="w-4 h-4" /></button>
@@ -241,7 +266,7 @@ export default function Movimientos() {
 
       {/* Modal — bottom-sheet en móvil */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/40 z-40 flex items-end sm:items-center sm:p-4" onClick={() => setShowModal(false)}>
+        <div className="fixed inset-0 bg-black/40 z-40 flex items-end justify-center sm:items-center sm:p-4" onClick={() => setShowModal(false)}>
           <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <h2 className="font-semibold text-gray-900">{editingItem ? 'Editar Movimiento' : 'Nuevo Movimiento'}</h2>
@@ -251,13 +276,28 @@ export default function Movimientos() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Tipo <span className="text-red-500">*</span></label>
                 <div className="flex gap-3">
-                  {['Ingreso', 'Salida'].map(t => (
-                    <button key={t} type="button" onClick={() => setForm({ ...form, tipo: t })}
-                      className={`flex-1 py-2 rounded-lg text-sm font-medium border-2 transition ${form.tipo === t ? (t === 'Ingreso' ? 'border-green-500 bg-green-50 text-green-700' : 'border-red-500 bg-red-50 text-red-700') : 'border-gray-300 text-gray-600'}`}>
-                      {t === 'Ingreso' ? '↑ ' : '↓ '}{t}
+                  {[{ key: 'I', label: 'Ingreso', icon: '↑' }, { key: 'S', label: 'Salida', icon: '↓' }].map(t => (
+                    <button key={t.key} type="button"
+                      onClick={() => setForm({ ...form, tipo: t.key, categoria: '' })}
+                      className={`flex-1 py-2 rounded-lg text-sm font-medium border-2 transition ${
+                        form.tipo === t.key
+                          ? (t.key === 'I' ? 'border-green-500 bg-green-50 text-green-700' : 'border-red-500 bg-red-50 text-red-700')
+                          : 'border-gray-300 text-gray-600'
+                      }`}>
+                      {t.icon} {t.label}
                     </button>
                   ))}
                 </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Categoría <span className="text-red-500">*</span></label>
+                <select required value={form.categoria} onChange={e => setForm({ ...form, categoria: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option value="">Seleccionar categoría...</option>
+                  {CATEGORIAS[form.tipo].map(c => (
+                    <option key={c} value={c}>{fmt(c)}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Concepto <span className="text-red-500">*</span></label>
@@ -279,7 +319,17 @@ export default function Movimientos() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Referencia</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Método de Pago</label>
+                <select value={form.metodo_pago} onChange={e => setForm({ ...form, metodo_pago: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option value="">Sin especificar</option>
+                  {METODOS_PAGO.map(m => (
+                    <option key={m} value={m}>{fmt(m)}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">N° Comprobante</label>
                 <input type="text" value={form.referencia} onChange={e => setForm({ ...form, referencia: e.target.value })}
                   placeholder="N° factura, recibo, etc."
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
@@ -288,8 +338,12 @@ export default function Movimientos() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Instalación Relacionada</label>
                 <select value={form.instalacion_id} onChange={e => setForm({ ...form, instalacion_id: e.target.value })}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                  <option value="">Sin instalación</option>
-                  {instalaciones.map(i => <option key={i.id} value={i.id}>{i.clientes?.nombre || 'Sin cliente'} — {i.fecha_instalacion || 'Sin fecha'}</option>)}
+                  <option value="">Sin instalación (gasto general)</option>
+                  {instalaciones.map(i => (
+                    <option key={i.id} value={i.id}>
+                      {i.clientes?.nombre || 'Sin cliente'} — {i.fecha_instalacion || 'Sin fecha'}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div className="flex gap-3 pt-1 pb-2">
