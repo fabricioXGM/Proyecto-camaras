@@ -66,7 +66,7 @@ export default function Dashboard() {
       supabase.from('instalaciones').select('*', { count: 'exact', head: true }).eq('activo', true).in('estado', ['programada', 'en_proceso']),
       supabase.from('mantenimientos').select('*', { count: 'exact', head: true }).eq('activo', true).eq('estado', 'programado'),
       supabase.from('movimientos').select('tipo, monto').eq('activo', true).gte('fecha', startMonth).lte('fecha', endMonth),
-      supabase.from('cotizaciones').select('id_cotizacion, id_cliente, fecha, estado, total, creado_en, clientes(nombre)').eq('activo', true).order('creado_en', { ascending: false }).limit(5),
+      supabase.from('cotizaciones').select('id_cotizacion, id_cliente, fecha, estado, creado_en, clientes(nombre), detalle_cotizacion(subtotal, activo)').eq('activo', true).order('creado_en', { ascending: false }).limit(5),
       supabase.from('instalaciones').select('id_instalacion, fecha_instalacion, estado, creado_en, cotizaciones(clientes(nombre))').eq('activo', true).order('creado_en', { ascending: false }).limit(5),
     ])
 
@@ -81,7 +81,14 @@ export default function Dashboard() {
       ingresosMes,
       salidasMes,
     })
-    setRecentCotizaciones(cotRecientes || [])
+    setRecentCotizaciones(
+      (cotRecientes || []).map(c => ({
+        ...c,
+        total: (c.detalle_cotizacion || [])
+          .filter(l => l.activo !== false)
+          .reduce((s, l) => s + Number(l.subtotal || 0), 0),
+      }))
+    )
     setRecentInstalaciones(instRecientes || [])
     setLoading(false)
   }

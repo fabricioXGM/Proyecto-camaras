@@ -6,6 +6,7 @@ import {
   getLineas, createLinea, updateLinea, deleteLinea, recalcularTotal,
 } from '../services/cotizaciones'
 import { getClientesSelect } from '../services/clientes'
+import { resolveUserName, fmtDate } from '../lib/audit'
 import { useNotification } from '../hooks/useNotification'
 
 const fmt = (s) => s ? s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '—'
@@ -43,6 +44,7 @@ export default function CotizacionDetalle() {
   const [editingLine, setEditingLine] = useState(null)
   const [lineForm, setLineForm] = useState(emptyLine)
   const [saving, setSaving] = useState(false)
+  const [auditInfo, setAuditInfo] = useState({ creador: null, modificador: null })
   const { notification, notify } = useNotification()
 
   useEffect(() => { fetchAll() }, [id])
@@ -57,6 +59,9 @@ export default function CotizacionDetalle() {
     if (cot) {
       setCotizacion(cot)
       setHeaderForm({ cliente_id: cot.cliente_id || '', fecha: cot.fecha, estado: cot.estado, notas: cot.notas || '' })
+      setAuditInfo({ creador: null, modificador: null })
+      if (cot.creado_por) resolveUserName(cot.creado_por).then(n => setAuditInfo(a => ({ ...a, creador: n })))
+      if (cot.modificado_por) resolveUserName(cot.modificado_por).then(n => setAuditInfo(a => ({ ...a, modificador: n })))
     }
     setLineas(lines || [])
     setClientes(cls || [])
@@ -215,6 +220,18 @@ export default function CotizacionDetalle() {
               <div className="col-span-2 sm:col-span-4">
                 <p className="text-gray-500 text-xs mb-1">Notas</p>
                 <p className="text-gray-700">{cotizacion.notas}</p>
+              </div>
+            )}
+            {cotizacion.creado_en && (
+              <div className="col-span-2 sm:col-span-4 border-t border-gray-100 pt-3 space-y-1">
+                <p className="text-xs text-gray-400">
+                  Creado por <span className="text-gray-600 font-medium">{auditInfo.creador || '…'}</span>{' el '}{fmtDate(cotizacion.creado_en)}
+                </p>
+                {cotizacion.modificado_en && (
+                  <p className="text-xs text-gray-400">
+                    Modificado por <span className="text-gray-600 font-medium">{auditInfo.modificador || '…'}</span>{' el '}{fmtDate(cotizacion.modificado_en)}
+                  </p>
+                )}
               </div>
             )}
           </div>

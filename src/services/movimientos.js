@@ -1,7 +1,7 @@
 import { supabase } from '../lib/supabase'
+import { getAuditUid } from '../lib/audit'
 
 // tipo en DB: 'I' = Ingreso, 'S' = Salida
-// referencia en form → nro_comprobante en DB
 const tr = (m) => m ? {
   ...m,
   id: m.id_movimiento,
@@ -9,12 +9,16 @@ const tr = (m) => m ? {
   referencia: m.nro_comprobante,
 } : m
 
-export const getMovimientos = async () => {
-  const { data, error } = await supabase
+export const getMovimientos = async ({ incluirEliminados = false } = {}) => {
+  let q = supabase
     .from('movimientos')
-    .select('id_movimiento, tipo, categoria, concepto, monto, fecha, metodo_pago, nro_comprobante, id_instalacion, creado_en')
-    .eq('activo', true)
-    .order('fecha', { ascending: false })
+    .select('id_movimiento, tipo, categoria, concepto, monto, fecha, metodo_pago, nro_comprobante, id_instalacion, activo, creado_por, creado_en')
+  if (!incluirEliminados) {
+    q = q.eq('activo', true)
+  } else {
+    q = q.order('activo', { ascending: false })
+  }
+  const { data, error } = await q.order('fecha', { ascending: false })
   return { data: data?.map(tr) ?? null, error }
 }
 
@@ -26,8 +30,9 @@ export const getMovimientosPorMes = (fechaInicio, fechaFin) =>
     .gte('fecha', fechaInicio)
     .lte('fecha', fechaFin)
 
-export const createMovimiento = (data) =>
-  supabase.from('movimientos').insert([{
+export const createMovimiento = async (data) => {
+  const uid = await getAuditUid()
+  return supabase.from('movimientos').insert([{
     tipo: data.tipo,
     categoria: data.categoria,
     concepto: data.concepto,
@@ -37,7 +42,10 @@ export const createMovimiento = (data) =>
     nro_comprobante: data.referencia || null,
     id_instalacion: data.instalacion_id || null,
     activo: true,
+    creado_por: uid,
+    creado_en: new Date().toISOString(),
   }])
+}
 
 export const updateMovimiento = (id, data) =>
   supabase.from('movimientos').update({
@@ -51,6 +59,8 @@ export const updateMovimiento = (id, data) =>
     id_instalacion: data.instalacion_id || null,
   }).eq('id_movimiento', id)
 
-// Borrado lógico
 export const deleteMovimiento = (id) =>
   supabase.from('movimientos').update({ activo: false }).eq('id_movimiento', id)
+
+export const restoreMovimiento = (id) =>
+  supabase.from('movimientos').update({ activo: true }).eq('id_movimiento', id)

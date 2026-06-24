@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { getAuditUid } from '../lib/audit'
 
 const tr = (c) => c ? {
   ...c,
@@ -16,16 +17,19 @@ const toDb = (data) => ({
 
 // ── Cotizaciones ──────────────────────────────────────────────
 
-export const getCotizaciones = async () => {
-  const { data, error } = await supabase
+export const getCotizaciones = async ({ incluirEliminados = false } = {}) => {
+  let q = supabase
     .from('cotizaciones')
-    .select('id_cotizacion, id_cliente, fecha, estado, observaciones, creado_en, clientes(nombre), detalle_cotizacion(subtotal, activo)')
-    .eq('activo', true)
-    .order('creado_en', { ascending: false })
+    .select('id_cotizacion, id_cliente, fecha, estado, observaciones, activo, creado_por, creado_en, modificado_por, modificado_en, clientes(nombre), detalle_cotizacion(subtotal, activo)')
+  if (!incluirEliminados) {
+    q = q.eq('activo', true)
+  } else {
+    q = q.order('activo', { ascending: false })
+  }
+  const { data, error } = await q.order('creado_en', { ascending: false })
   return {
     data: data?.map(c => ({
       ...tr(c),
-      // Calcula total desde las líneas activas, independiente del trigger de Supabase
       total: (c.detalle_cotizacion || [])
         .filter(l => l.activo !== false)
         .reduce((s, l) => s + Number(l.subtotal || 0), 0),
@@ -35,46 +39,81 @@ export const getCotizaciones = async () => {
 }
 
 export const getCotizacionesSelect = async () => {
-  const { data, error } = await supabase
-    .from('cotizaciones')
-    .select('id_cotizacion, id_cliente, clientes(nombre), detalle_cotizacion(subtotal, activo)')
-    .eq('activo', true)
-    .order('creado_en', { ascending: false })
+  const [{ data: cotData, error }, { data: instData }] = await Promise.all([
+    supabase
+      .from('cotizaciones')
+      .select('id_cotizacion, id_cliente, estado, clientes(nombre, direccion), detalle_cotizacion(subtotal, activo)')
+      .eq('activo', true)
+      .order('creado_en', { ascending: false }),
+    supabase
+      .from('instalaciones')
+      .select('id_cotizacion')
+      .eq('activo', true),
+  ])
+  if (error) return { data: null, error }
+  const usadas = new Set((instData || []).map(i => i.id_cotizacion))
   return {
-    data: data?.map(c => ({
+    data: cotData?.map(c => ({
       ...tr(c),
       total: (c.detalle_cotizacion || [])
         .filter(l => l.activo !== false)
         .reduce((s, l) => s + Number(l.subtotal || 0), 0),
+      yaUsada: usadas.has(c.id_cotizacion),
     })) ?? null,
-    error,
+    error: null,
   }
 }
 
 export const getCotizacion = async (id) => {
   const { data, error } = await supabase
     .from('cotizaciones')
-    .select('id_cotizacion, id_cliente, fecha, estado, total, observaciones, creado_en, clientes(nombre)')
+    .select('id_cotizacion, id_cliente, fecha, estado, total, observaciones, creado_por, creado_en, modificado_por, modificado_en, clientes(nombre)')
     .eq('id_cotizacion', id)
     .single()
   return { data: tr(data), error }
 }
 
 export const createCotizacion = async (data) => {
+  const uid = await getAuditUid()
   const { data: created, error } = await supabase
     .from('cotizaciones')
-    .insert([{ ...toDb(data), activo: true }])
+    .insert([{
+      ...toDb(data),
+      activo: true,
+      creado_por: uid,
+      creado_en: new Date().toISOString(),
+    }])
     .select()
     .single()
   return { data: tr(created), error }
 }
 
-export const updateCotizacion = (id, data) =>
-  supabase.from('cotizaciones').update(toDb(data)).eq('id_cotizacion', id)
+export const updateCotizacion = async (id, data) => {
+  const uid = await getAuditUid()
+  return supabase.from('cotizaciones').update({
+    ...toDb(data),
+    modificado_por: uid,
+    modificado_en: new Date().toISOString(),
+  }).eq('id_cotizacion', id)
+}
 
-// Borrado lógico
-export const deleteCotizacion = (id) =>
-  supabase.from('cotizaciones').update({ activo: false }).eq('id_cotizacion', id)
+export const deleteCotizacion = async (id) => {
+  const uid = await getAuditUid()
+  return supabase.from('cotizaciones').update({
+    activo: false,
+    modificado_por: uid,
+    modificado_en: new Date().toISOString(),
+  }).eq('id_cotizacion', id)
+}
+
+export const restoreCotizacion = async (id) => {
+  const uid = await getAuditUid()
+  return supabase.from('cotizaciones').update({
+    activo: true,
+    modificado_por: uid,
+    modificado_en: new Date().toISOString(),
+  }).eq('id_cotizacion', id)
+}
 
 // ── Líneas de detalle (tabla: detalle_cotizacion) ─────────────
 
@@ -114,12 +153,10 @@ export const updateLinea = (id, data) =>
     subtotal: Number(data.cantidad) * Number(data.precio_unitario),
   }).eq('id_detalle', id)
 
-// Borrado lógico
 export const deleteLinea = (id) =>
   supabase.from('detalle_cotizacion').update({ activo: false }).eq('id_detalle', id)
 
-// Trigger en Supabase actualiza el total automáticamente.
-// Esta función es un respaldo por si el trigger no está activo.
+// Respaldo por si el trigger de Supabase no está activo
 export const recalcularTotal = async (cotizacionId) => {
   const { data: lineas } = await getLineas(cotizacionId)
   const total = (lineas || []).reduce((sum, l) => sum + Number(l.subtotal || 0), 0)
