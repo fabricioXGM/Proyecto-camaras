@@ -19,19 +19,36 @@ const toDb = (data) => ({
 export const getCotizaciones = async () => {
   const { data, error } = await supabase
     .from('cotizaciones')
-    .select('id_cotizacion, id_cliente, fecha, estado, total, observaciones, creado_en, clientes(nombre)')
+    .select('id_cotizacion, id_cliente, fecha, estado, observaciones, creado_en, clientes(nombre), detalle_cotizacion(subtotal, activo)')
     .eq('activo', true)
     .order('creado_en', { ascending: false })
-  return { data: data?.map(tr) ?? null, error }
+  return {
+    data: data?.map(c => ({
+      ...tr(c),
+      // Calcula total desde las líneas activas, independiente del trigger de Supabase
+      total: (c.detalle_cotizacion || [])
+        .filter(l => l.activo !== false)
+        .reduce((s, l) => s + Number(l.subtotal || 0), 0),
+    })) ?? null,
+    error,
+  }
 }
 
 export const getCotizacionesSelect = async () => {
   const { data, error } = await supabase
     .from('cotizaciones')
-    .select('id_cotizacion, id_cliente, total, clientes(nombre)')
+    .select('id_cotizacion, id_cliente, clientes(nombre), detalle_cotizacion(subtotal, activo)')
     .eq('activo', true)
     .order('creado_en', { ascending: false })
-  return { data: data?.map(tr) ?? null, error }
+  return {
+    data: data?.map(c => ({
+      ...tr(c),
+      total: (c.detalle_cotizacion || [])
+        .filter(l => l.activo !== false)
+        .reduce((s, l) => s + Number(l.subtotal || 0), 0),
+    })) ?? null,
+    error,
+  }
 }
 
 export const getCotizacion = async (id) => {

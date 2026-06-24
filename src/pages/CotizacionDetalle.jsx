@@ -61,6 +61,8 @@ export default function CotizacionDetalle() {
     setLineas(lines || [])
     setClientes(cls || [])
     setLoading(false)
+    // Sincroniza el total en DB en segundo plano (por si el trigger no está activo)
+    if (lines?.length) recalcularTotal(id)
   }
 
   async function saveHeader(e) {
@@ -207,7 +209,7 @@ export default function CotizacionDetalle() {
             </div>
             <div>
               <p className="text-gray-500 text-xs mb-1">Total</p>
-              <p className="font-bold text-lg text-indigo-600">S/ {Number(cotizacion.total || 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}</p>
+              <p className="font-bold text-lg text-indigo-600">S/ {total.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</p>
             </div>
             {cotizacion.notas && (
               <div className="col-span-2 sm:col-span-4">
